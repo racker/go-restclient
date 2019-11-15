@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package main
+package restclient
 
 import (
 	"bytes"
@@ -30,35 +30,36 @@ import (
 
 const defaultRestClientTimeout = 60 * time.Second
 
-// RestClient provides a high-order implementation around Go's http.Request by incorporating
+// Client provides a high-order type wrapping Go's http.Request by incorporating
 // relative URL building,
 // timeout management,
 // JSON request encoding,
 // JSON response decoding,
 // and non-2xx response status handling
-type RestClient struct {
+type Client struct {
 	BaseUrl      *url.URL
 	Timeout      time.Duration
 	interceptors *list.List
 }
 
-// RestClientNext is the callback type that will be provided to implementations of RestClientInterceptor
-type RestClientNext func(req *http.Request) (*http.Response, error)
+// NextCallback is the callback type that will be provided to implementations of Interceptor to
+// progress the request processing to next interceptor or the final request transmission.
+type NextCallback func(req *http.Request) (*http.Response, error)
 
-// RestClientInterceptor can be implemented to modify or replace an outgoing request and/or
+// Interceptor can be implemented to modify or replace an outgoing request and/or
 // modify or replace the returned response. Implementations **must** invoke the next function.
 //
 // If processing only the outgoing request, then the interceptor can simply return the values of
 // the call to next, such as
 //
 // return next(req)
-type RestClientInterceptor func(req *http.Request, next RestClientNext) (*http.Response, error)
+type Interceptor func(req *http.Request, next NextCallback) (*http.Response, error)
 
 // FailedResponseError indicates that the server responded, but with a non-2xx status code
 type FailedResponseError struct {
 	StatusCode int
 	Status     string
-	Entity     *RestEntity
+	Entity     *Entity
 }
 
 func (r *FailedResponseError) Error() string {
@@ -75,18 +76,18 @@ func (r *FailedResponseError) Error() string {
 	return r.Status
 }
 
-func NewRestClient() *RestClient {
-	return &RestClient{}
+func New() *Client {
+	return &Client{}
 }
 
-func (c *RestClient) AddInterceptor(it RestClientInterceptor) {
+func (c *Client) AddInterceptor(it Interceptor) {
 	if c.interceptors == nil {
 		c.interceptors = list.New()
 	}
 	c.interceptors.PushBack(it)
 }
 
-func (c *RestClient) SetBaseUrl(rawurl string) error {
+func (c *Client) SetBaseUrl(rawurl string) error {
 	url, err := url.Parse(rawurl)
 	if err != nil {
 		return fmt.Errorf("failed to parse given base url: %w", err)
@@ -99,21 +100,29 @@ type MimeType string
 
 const (
 	JsonType MimeType = "application/json"
+	TextType MimeType = "text/plain"
 )
 
 const (
-	HeaderContentType = "Content-Type"
-	HeaderAccept      = "Accept"
+	headerContentType = "Content-Type"
+	headerAccept      = "Accept"
 )
 
-type RestEntity struct {
+type Entity struct {
 	ContentType MimeType
 	Content     interface{}
 }
 
-func NewJsonEntity(content interface{}) *RestEntity {
-	return &RestEntity{
+func NewJsonEntity(content interface{}) *Entity {
+	return &Entity{
 		ContentType: JsonType,
+		Content:     content,
+	}
+}
+
+func NewTextEntity(content string) *Entity {
+	return &Entity{
+		ContentType: TextType,
 		Content:     content,
 	}
 }
@@ -125,29 +134,30 @@ func NewJsonEntity(content interface{}) *RestEntity {
 //
 // If given, the query values are encoded into the final request URL.
 //
-// If body is non-nil, it will be used as the request payload.
-// If body is a []byte, the content will be used as is,
-// but any other type combined with a contentType of JsonType will be encoded as JSON.
+// If reqIn is non-nil, the entity's content will be used as the request payload.
+// The entity's content can be a string, []byte, io.Reader, or if the entity's content type is
+// JsonType, then referenced value will be JSON encoded.
 //
-// If respOut is non-nil, the response body will be placed at the given location. If a *string or *byte.Buffer
-// is given, then the raw response body is used. Any other type combined with an accept of JsonType will
-// be decoded as JSON.
+// If respOut is non-nil, the response body will be placed in the entity's content and the
+// content type of that entity is set.
+// The response entity's content can be a string, []byte, io.Writer, or if the entity's content type is
+// JsonType, then the response body is JSON decoded into the content reference.
 //
 // If the far-end responded with a non-2xx status code, then the returned error will be a
 // FailedResponseError, which conveys the status code and response body's content.
-func (c *RestClient) Exchange(method string,
+func (c *Client) Exchange(method string,
 	urlIn string, query url.Values,
-	reqIn *RestEntity,
-	respOut *RestEntity) error {
+	reqIn *Entity,
+	respOut *Entity) error {
 	return c.ExchangeWithContext(nil, method, urlIn, query, reqIn, respOut)
 }
 
 // ExchangeWithContext is the same as Exchange, but allows for a context to be provided
 // to derive the request timeout context.
-func (c *RestClient) ExchangeWithContext(ctx context.Context, method string,
+func (c *Client) ExchangeWithContext(ctx context.Context, method string,
 	urlIn string, query url.Values,
-	reqIn *RestEntity,
-	respOut *RestEntity) error {
+	reqIn *Entity,
+	respOut *Entity) error {
 
 	reqUrl, err := c.buildReqUrl(urlIn, query)
 	if err != nil {
@@ -199,7 +209,7 @@ func (c *RestClient) ExchangeWithContext(ctx context.Context, method string,
 	return nil
 }
 
-func (c *RestClient) buildReqUrl(urlIn string, query url.Values) (*url.URL, error) {
+func (c *Client) buildReqUrl(urlIn string, query url.Values) (*url.URL, error) {
 	var reqUrl *url.URL
 	if c.BaseUrl != nil {
 		var err error
@@ -220,12 +230,16 @@ func (c *RestClient) buildReqUrl(urlIn string, query url.Values) (*url.URL, erro
 	return reqUrl, nil
 }
 
-func (c *RestClient) buildBodyReader(reqIn *RestEntity) (io.Reader, error) {
+func (c *Client) buildBodyReader(reqIn *Entity) (io.Reader, error) {
 	var bodyReader io.Reader
 	if reqIn == nil {
 		bodyReader = nil
+	} else if s, ok := reqIn.Content.(string); ok {
+		bodyReader = bytes.NewBufferString(s)
 	} else if b, ok := reqIn.Content.([]byte); ok {
 		bodyReader = bytes.NewBuffer(b)
+	} else if r, ok := reqIn.Content.(io.Reader); ok {
+		bodyReader = r
 	} else if reqIn.ContentType == JsonType && reqIn.Content != nil {
 		var buffer bytes.Buffer
 		encoder := json.NewEncoder(&buffer)
@@ -240,31 +254,38 @@ func (c *RestClient) buildBodyReader(reqIn *RestEntity) (io.Reader, error) {
 	return bodyReader, nil
 }
 
-func (c *RestClient) buildRequest(timeoutCtx context.Context, method string, reqUrl *url.URL,
-	bodyReader io.Reader, reqIn *RestEntity, respOut *RestEntity) (*http.Request, error) {
+func (c *Client) buildRequest(timeoutCtx context.Context, method string, reqUrl *url.URL,
+	bodyReader io.Reader, reqIn *Entity, respOut *Entity) (*http.Request, error) {
 	req, err := http.NewRequestWithContext(timeoutCtx, method, reqUrl.String(), bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup request: %w", err)
 	}
 	if reqIn != nil && reqIn.ContentType != "" {
-		req.Header.Set(HeaderContentType, string(reqIn.ContentType))
+		req.Header.Set(headerContentType, string(reqIn.ContentType))
 	}
 	if respOut != nil && respOut.ContentType != "" {
-		req.Header.Set(HeaderAccept, string(respOut.ContentType))
+		req.Header.Set(headerAccept, string(respOut.ContentType))
 	}
 	return req, nil
 }
 
-func (c *RestClient) processResponseContent(respOut *RestEntity, resp *http.Response) error {
-	if rs, ok := respOut.Content.(*string); ok {
+func (c *Client) processResponseContent(respOut *Entity, resp *http.Response) error {
+	if _, ok := respOut.Content.(string); ok {
 		var buffer bytes.Buffer
 		_, err := io.Copy(&buffer, resp.Body)
 		if err != nil {
 			return fmt.Errorf("failed to read response body: %w", err)
 		}
-		*rs = buffer.String()
-	} else if rb, ok := respOut.Content.(*bytes.Buffer); ok {
-		_, err := io.Copy(rb, resp.Body)
+		respOut.Content = buffer.String()
+	} else if _, ok := respOut.Content.([]byte); ok {
+		var buffer bytes.Buffer
+		_, err := io.Copy(&buffer, resp.Body)
+		if err != nil {
+			return fmt.Errorf("failed to read response body: %w", err)
+		}
+		respOut.Content = buffer.Bytes()
+	} else if w, ok := respOut.Content.(io.Writer); ok {
+		_, err := io.Copy(w, resp.Body)
 		if err != nil {
 			return fmt.Errorf("failed to read response body: %w", err)
 		}
@@ -280,31 +301,31 @@ func (c *RestClient) processResponseContent(respOut *RestEntity, resp *http.Resp
 	return nil
 }
 
-func (c *RestClient) buildFailedResponseError(resp *http.Response) error {
+func (c *Client) buildFailedResponseError(resp *http.Response) error {
 	var buffer bytes.Buffer
 	_, _ = io.Copy(&buffer, resp.Body)
 	_ = resp.Body.Close()
 	return &FailedResponseError{
 		StatusCode: resp.StatusCode,
 		Status:     resp.Status,
-		Entity: &RestEntity{
-			ContentType: MimeType(resp.Header.Get(HeaderContentType)),
+		Entity: &Entity{
+			ContentType: MimeType(resp.Header.Get(headerContentType)),
 			Content:     buffer.Bytes(),
 		},
 	}
 }
 
-// doRequest will recursively process the interceptors via the position in the list conveyed by itElem
-// and when itElem is nil the actual request is issued
-func (c *RestClient) doRequest(req *http.Request, itElem *list.Element) (*http.Response, error) {
+// doRequest will recursively process the interceptors via the position in the list conveyed by interceptorElem
+// and when interceptorElem is nil the actual request is issued
+func (c *Client) doRequest(req *http.Request, interceptorElem *list.Element) (*http.Response, error) {
 
-	if itElem == nil {
+	if interceptorElem == nil {
 		return http.DefaultClient.Do(req)
 	} else {
 		// use unchecked cast since we force value types via AddInterceptor
-		it := itElem.Value.(RestClientInterceptor)
-		response, err := it(req, func(newReq *http.Request) (*http.Response, error) {
-			return c.doRequest(newReq, itElem.Next())
+		interceptor := interceptorElem.Value.(Interceptor)
+		response, err := interceptor(req, func(newReq *http.Request) (*http.Response, error) {
+			return c.doRequest(newReq, interceptorElem.Next())
 		})
 		if err != nil {
 			return nil, err
@@ -314,7 +335,7 @@ func (c *RestClient) doRequest(req *http.Request, itElem *list.Element) (*http.R
 	}
 }
 
-func (c *RestClient) timeout() time.Duration {
+func (c *Client) timeout() time.Duration {
 	if c.Timeout != 0 {
 		return c.Timeout
 	} else {
