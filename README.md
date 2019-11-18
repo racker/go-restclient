@@ -1,4 +1,7 @@
-# go-restclient [![GoDoc][doc-img]][doc]
+# go-restclient 
+
+[![GoDoc](https://godoc.org/github.com/racker/go-restclient?status.svg)](https://godoc.org/github.com/racker/go-restclient)
+[![](https://img.shields.io/badge/go.dev-module-007D9C)](https://pkg.go.dev/github.com/racker/go-restclient)
 
 A higher-order type that simplifies calling REST APIs. It wraps the standard http and json packages to provide the following features:
 
