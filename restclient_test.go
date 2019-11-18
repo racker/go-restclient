@@ -28,7 +28,6 @@ import (
 	"net/url"
 )
 
-//noinspection GoUnhandledErrorResult
 func Example_post() {
 	// Setup a test HTTP server
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -61,7 +60,6 @@ func Example_post() {
 	// greetings via /ping
 }
 
-//noinspection GoUnhandledErrorResult
 func Example_getWithQuery() {
 	// Setup a test HTTP server
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -96,7 +94,6 @@ func Example_getWithQuery() {
 	// {Rows:[green apple mandarin orange]}
 }
 
-//noinspection GoUnhandledErrorResult
 func Example_postText() {
 	// Setup a test HTTP server
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -121,7 +118,6 @@ func Example_postText() {
 	// RECV TYPE text/plain
 }
 
-//noinspection GoUnhandledErrorResult
 func Example_interceptorSetHeader() {
 	// Setup a test HTTP server
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -152,7 +148,6 @@ func Example_interceptorSetHeader() {
 	// RECV HEADER 123
 }
 
-//noinspection GoUnhandledErrorResult
 func Example_interceptorLogging() {
 	// Setup a test HTTP server
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -187,7 +182,6 @@ func Example_interceptorLogging() {
 	// greetings
 }
 
-//noinspection GoUnhandledErrorResult
 func Example_externalEncoding() {
 	// Setup a test HTTP server
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
