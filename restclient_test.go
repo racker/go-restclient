@@ -233,3 +233,61 @@ func Example_externalEncoding() {
 	// <MsgHolder><Msg>hello</Msg></MsgHolder>
 	// hello
 }
+
+func Example_decodeError() {
+	// Setup a test HTTP server
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"msg":{"content":4}}`)
+	}))
+	defer ts.Close()
+
+	// Real example starts here
+	client := restclient.New()
+	client.SetBaseUrl(ts.URL)
+
+	type MsgHolder struct {
+		Msg string
+	}
+	var resp MsgHolder
+
+	err := client.Exchange("GET", "/msg", nil, nil,
+		restclient.NewJsonEntity(&resp))
+	if err != nil {
+		fmt.Println(err)
+	}
+	// Output:
+	// failed to decode response: json: cannot unmarshal object into Go struct field MsgHolder.Msg of type string
+}
+
+func ExampleBasicAuth() {
+	// Setup a test HTTP server
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		username, password, ok := r.BasicAuth()
+		fmt.Printf("RECV %s %s %t\n", username, password, ok)
+
+		// respond
+		fmt.Fprint(w, `{"msg":"authenticated"}`)
+	}))
+	defer ts.Close()
+
+	// Real example starts here
+	client := restclient.New()
+	client.SetBaseUrl(ts.URL)
+	client.AddInterceptor(restclient.BasicAuth("admin", "notsecret"))
+
+	type MsgHolder struct {
+		Msg string
+	}
+	var resp MsgHolder
+
+	err := client.Exchange("GET", "/msg", nil, nil,
+		restclient.NewJsonEntity(&resp))
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(resp.Msg)
+	// Output:
+	// RECV admin notsecret true
+	// authenticated
+
+}
