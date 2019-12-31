@@ -76,7 +76,7 @@ func (r *FailedResponseError) Error() string {
 	return r.Status
 }
 
-func New() *Client {
+func NewClient() *Client {
 	return &Client{}
 }
 

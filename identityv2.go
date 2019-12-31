@@ -35,7 +35,7 @@ func IdentityV2Authenticator(identityUrl string, username string, password strin
 	}
 
 	// looks slightly convoluted, but dogfood our own library to access the Identity REST API
-	restClient := New()
+	restClient := NewClient()
 	err := restClient.SetBaseUrl(identityUrl)
 	if err != nil {
 		return nil, fmt.Errorf("invalid Identity URL: %w", err)

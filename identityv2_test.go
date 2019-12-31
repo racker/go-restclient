@@ -13,7 +13,7 @@ func ExampleIdentityV2Authenticator() {
 		log.Fatal(err)
 	}
 
-	client := restclient.New()
+	client := restclient.NewClient()
 	client.AddInterceptor(authenticator)
 
 	// calls to client.Exchange will get x-auth-token auto populated by interceptor

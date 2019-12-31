@@ -38,7 +38,7 @@ func Example_post() {
 	defer ts.Close()
 
 	// Real example starts here
-	client := restclient.New()
+	client := restclient.NewClient()
 	client.SetBaseUrl(ts.URL)
 
 	type MsgHolder struct {
@@ -69,7 +69,7 @@ func Example_getWithQuery() {
 	defer ts.Close()
 
 	// Real example starts here
-	client := restclient.New()
+	client := restclient.NewClient()
 	client.SetBaseUrl(ts.URL)
 
 	query := make(url.Values)
@@ -104,7 +104,7 @@ func Example_postText() {
 	defer ts.Close()
 
 	// Real example starts here
-	client := restclient.New()
+	client := restclient.NewClient()
 	client.SetBaseUrl(ts.URL)
 
 	err := client.Exchange("POST", "/ingest", nil,
@@ -126,7 +126,7 @@ func Example_interceptorSetHeader() {
 	defer ts.Close()
 
 	// Real example starts here
-	client := restclient.New()
+	client := restclient.NewClient()
 	client.SetBaseUrl(ts.URL)
 	client.AddInterceptor(func(req *http.Request, next restclient.NextCallback) (*http.Response, error) {
 		req.Header.Set("x-req-id", "123")
@@ -157,7 +157,7 @@ func Example_interceptorLogging() {
 	defer ts.Close()
 
 	// Real example starts here
-	client := restclient.New()
+	client := restclient.NewClient()
 	client.SetBaseUrl(ts.URL)
 	client.AddInterceptor(func(req *http.Request, next restclient.NextCallback) (*http.Response, error) {
 		fmt.Printf("OUT %s %s\n", req.Method, req.URL.Path)
@@ -193,7 +193,7 @@ func Example_externalEncoding() {
 	defer ts.Close()
 
 	// Real example starts here
-	client := restclient.New()
+	client := restclient.NewClient()
 	client.SetBaseUrl(ts.URL)
 
 	type MsgHolder struct {
@@ -242,7 +242,7 @@ func Example_decodeError() {
 	defer ts.Close()
 
 	// Real example starts here
-	client := restclient.New()
+	client := restclient.NewClient()
 	client.SetBaseUrl(ts.URL)
 
 	type MsgHolder struct {
@@ -271,7 +271,7 @@ func ExampleBasicAuth() {
 	defer ts.Close()
 
 	// Real example starts here
-	client := restclient.New()
+	client := restclient.NewClient()
 	client.SetBaseUrl(ts.URL)
 	client.AddInterceptor(restclient.BasicAuth("admin", "notsecret"))
 
