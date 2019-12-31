@@ -28,7 +28,7 @@ interceptors to inject authentication tokens, etc
 
 Quick example
 
-	client := restclient.New()
+	client := restclient.NewClient()
 	client.SetBaseUrl("http://your.own.domain")
 
 	type MsgHolder struct {
@@ -42,5 +42,5 @@ Quick example
 		restclient.NewJsonEntity(req), restclient.NewJsonEntity(&resp))
 
   	fmt.Println(resp.Msg)
- */
+*/
 package restclient
