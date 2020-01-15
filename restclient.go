@@ -28,7 +28,10 @@ import (
 	"time"
 )
 
-const defaultRestClientTimeout = 60 * time.Second
+const (
+	defaultRestClientTimeout = 60 * time.Second
+	errorMessageLimit        = 1000
+)
 
 // Client provides a high-order type wrapping Go's http.Request by incorporating
 // relative URL building,
@@ -66,8 +69,8 @@ func (r *FailedResponseError) Error() string {
 	// if []byte content then truncate and include in error
 	if r.Entity != nil {
 		if b, ok := r.Entity.Content.([]byte); ok {
-			if len(b) > 100 {
-				b = b[:100]
+			if len(b) > errorMessageLimit {
+				b = b[:errorMessageLimit]
 			}
 			return fmt.Sprintf("%s body=[%s]", r.Status, string(b))
 		}
